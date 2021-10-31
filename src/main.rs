@@ -1,13 +1,13 @@
-use glium::{glutin, Surface, implement_vertex};
+use glium::{glutin, Surface, implement_vertex, uniform};
 
 fn main() {
     // Variables for opening a window
-    let el = glutin::event_loop::EventLoop::new();
-    let wb = glutin::window::WindowBuilder::new()
+    let event_loop = glutin::event_loop::EventLoop::new();
+    let window_builder = glutin::window::WindowBuilder::new()
         .with_title("test")
         .with_inner_size(glutin::dpi::LogicalSize::new(320, 234));
-    let cb = glutin::ContextBuilder::new();
-    let display = glium::Display::new(wb, cb, &el).unwrap();
+    let context_builder = glutin::ContextBuilder::new();
+    let display = glium::Display::new(window_builder, context_builder, &event_loop).unwrap();
 
     #[derive(Copy, Clone)]
     struct Vertex {
@@ -32,8 +32,12 @@ fn main() {
 
         in vec2 position;
 
+        uniform float t;
+
         void main() {
-            gl_Position = vec4(position, 0.0, 1.0);
+            vec2 pos = position;
+            pos.x += t;
+            gl_Position = vec4(pos, 0.0, 1.0);
         }
     "#;
 
@@ -50,20 +54,10 @@ fn main() {
     let program = glium::Program::from_source(&display, vertex_shader_src,
                                               fragment_shader_src, None).unwrap();
 
+    let mut t: f32 = -0.5;
     // Keep the window open until the user closes it
-    el.run(move |ev, _, control_flow| {
-        // Fill the window with a single color
-        let mut target = display.draw();
-        target.clear_color(0.08, 0.0, 0.24, 1.0);
-        target.draw(&vertex_buffer, &indices, &program, &glium::uniforms::EmptyUniforms,
-                    &Default::default()).unwrap();
-        target.finish().unwrap();
-
-        let next_frame_time = std::time::Instant::now() +
-            std::time::Duration::from_nanos(16_666_667);
-
-        *control_flow = glutin::event_loop::ControlFlow::WaitUntil(next_frame_time);
-        match ev {
+    event_loop.run(move |event, _, control_flow| {
+        match event {
             glutin::event::Event::WindowEvent { event, .. } => match event {
                 glutin::event::WindowEvent::CloseRequested => {
                     *control_flow = glutin::event_loop::ControlFlow::Exit;
@@ -71,7 +65,27 @@ fn main() {
                 }
                 _ => return,
             },
+            glutin::event::Event::NewEvents(cause) => match cause {
+                glutin::event::StartCause::ResumeTimeReached { .. } => (),
+                glutin::event::StartCause::Init => (),
+                _ => return,
+            },
             _ => (),
         }
+
+        let next_frame_time = std::time::Instant::now() +
+            std::time::Duration::from_nanos(16_666_667);
+        *control_flow = glutin::event_loop::ControlFlow::WaitUntil(next_frame_time);
+
+        t += 0.0002;
+        if t > 0.5 {
+            t = -0.5;
+        }
+
+        let mut target = display.draw();
+        target.clear_color(0.08, 0.0, 0.24, 1.0);
+        target.draw(&vertex_buffer, &indices, &program, &uniform! {t: t},
+                    &Default::default()).unwrap();
+        target.finish().unwrap();
     });
 }
