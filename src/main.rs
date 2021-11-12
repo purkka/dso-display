@@ -1,58 +1,94 @@
 use glium::{glutin, Surface, implement_vertex, uniform};
+use std::time::{SystemTime};
+
+#[derive(Copy, Clone)]
+struct Vertex<T> {
+    position: [T; 2],
+}
+
+impl<T> Vertex<T> {
+    fn new(x: T, y: T) -> Self {
+        Self {
+            position: [x, y]
+        }
+    }
+}
 
 fn main() {
+    const WIDTH: u32 = 320;
+    const HEIGHT: u32 = 234;
+
     // Variables for opening a window
     let event_loop = glutin::event_loop::EventLoop::new();
     let window_builder = glutin::window::WindowBuilder::new()
         .with_title("test")
-        .with_inner_size(glutin::dpi::LogicalSize::new(320, 234));
+        .with_inner_size(glutin::dpi::LogicalSize::new(WIDTH, HEIGHT));
     let context_builder = glutin::ContextBuilder::new();
     let display = glium::Display::new(window_builder, context_builder, &event_loop).unwrap();
 
-    #[derive(Copy, Clone)]
-    struct Vertex {
-        position: [f32; 2],
-    }
+    type VertexF32 = Vertex<f32>;
+    implement_vertex!(VertexF32, position);
 
-    implement_vertex!(Vertex, position);
-
-    // A simple triangle shape
-    let vertex1 = Vertex { position: [0.0, 0.4] };
-    let vertex2 = Vertex { position: [0.6, -0.2] };
-    let vertex3 = Vertex { position: [-0.3, -0.3] };
-    let shape = vec![vertex1, vertex2, vertex3];
+    // Two triangles in a fan shape
+    let vertex1 = Vertex::new(1.0, 1.0);
+    let vertex2 = Vertex::new(-1.0, 1.0);
+    let vertex3 = Vertex::new(-1.0, -1.0);
+    let vertex4 = Vertex::new(1.0, -1.0);
+    let shape: Vec<Vertex<f32>> = vec![vertex1, vertex2, vertex3, vertex4];
 
     let vertex_buffer = glium::VertexBuffer::new(&display, &shape).unwrap();
 
     // Dummy indices for the time being
-    let indices = glium::index::NoIndices(glium::index::PrimitiveType::TrianglesList);
+    let indices = glium::index::NoIndices(glium::index::PrimitiveType::TriangleFan);
 
     let vertex_shader_src = r#"
         #version 140
 
         in vec2 position;
 
-        uniform mat4 matrix;
-
         void main() {
-            gl_Position = matrix * vec4(position, 0.0, 1.0);
+            gl_Position = vec4(position, 0, 1);
         }
     "#;
 
     let fragment_shader_src = r#"
         #version 140
+        #define PI 3.141592
 
         out vec4 color;
 
+        uniform float time;
+        uniform uint height;
+
         void main() {
-            color = vec4(1.0, 0.2, 0.0, 1.0);
+            vec2 uv = gl_FragCoord.xy / height;
+            uv.y += time / 8;
+
+            // variables
+            float split = 8;
+            float ncol = 2;
+
+            // the slope
+            uv.y -= tan(PI / 4) * uv.x;
+
+            // colors every other stripe
+            if (mod(floor(uv.y * split), ncol) == 0) {
+                color = vec4(0.25, 0.25, 0.25, 1);
+            } else { // keep transparent
+                color = vec4(0);
+            }
         }
     "#;
 
     let program = glium::Program::from_source(&display, vertex_shader_src,
                                               fragment_shader_src, None).unwrap();
 
-    let mut t: f32 = -0.5;
+    let draw_parameters = glium::DrawParameters {
+        blend: glium::Blend::alpha_blending(),
+        .. Default::default()
+    };
+
+    let start_time = SystemTime::now();
     // Keep the window open until the user closes it
     event_loop.run(move |event, _, control_flow| {
         match event {
@@ -75,25 +111,15 @@ fn main() {
             std::time::Duration::from_nanos(16_666_667);
         *control_flow = glutin::event_loop::ControlFlow::WaitUntil(next_frame_time);
 
-        t += 0.0002;
-        if t > 0.5 {
-            t = -0.5;
-        }
-
         let uniforms = uniform! {
-            // Column-major
-            matrix: [
-                [1.0, 0.0, 0.0, 0.0],
-                [0.0, 1.0, 0.0, 0.0],
-                [0.0, 0.0, 1.0, 0.0],
-                [t, 0.0, 0.0, 1.0f32],
-            ]
+            height: HEIGHT,
+            time: SystemTime::now().duration_since(start_time).unwrap().as_secs_f32(),
         };
 
         let mut target = display.draw();
-        target.clear_color(0.08, 0.0, 0.24, 1.0);
+        target.clear_color(0.2, 0.2, 0.2, 1.0);
         target.draw(&vertex_buffer, &indices, &program, &uniforms,
-                    &Default::default()).unwrap();
+                    &draw_parameters).unwrap();
         target.finish().unwrap();
     });
 }
