@@ -1,20 +1,7 @@
+mod vertex;
+
 use glium::{glutin, Surface, implement_vertex, uniform};
 use std::time::{SystemTime};
-
-#[derive(Copy, Clone)]
-struct Vertex<T> {
-    position: [T; 2],
-    tex_coords: [T; 2],
-}
-
-impl<T> Vertex<T> {
-    fn new((x, y): (T, T), (tx, ty): (T, T)) -> Self {
-        Self {
-            position: [x, y],
-            tex_coords: [tx, ty],
-        }
-    }
-}
 
 fn main() {
     const WIDTH: u32 = 320;
@@ -38,15 +25,15 @@ fn main() {
     let image = glium::texture::RawImage2d::from_raw_rgba_reversed(&pixel_data, (2u32, 2u32));
     let texture = glium::texture::SrgbTexture2d::new(&display, image).unwrap();
 
-    type VertexF32 = Vertex<f32>;
+    type VertexF32 = vertex::Vertex<f32>;
     implement_vertex!(VertexF32, position, tex_coords);
 
     // Two triangles in a fan shape
-    let vertex1 = Vertex::new((1.0, 1.0), (1.0, 1.0));
-    let vertex2 = Vertex::new((-1.0, 1.0), (0.0, 1.0));
-    let vertex3 = Vertex::new((-1.0, -1.0), (0.0, 0.0));
-    let vertex4 = Vertex::new((1.0, -1.0), (1.0, 0.0));
-    let shape: Vec<Vertex<f32>> = vec![vertex1, vertex2, vertex3, vertex4];
+    let vertex1 = vertex::Vertex::new((1.0, 1.0), (1.0, 1.0));
+    let vertex2 = vertex::Vertex::new((-1.0, 1.0), (0.0, 1.0));
+    let vertex3 = vertex::Vertex::new((-1.0, -1.0), (0.0, 0.0));
+    let vertex4 = vertex::Vertex::new((1.0, -1.0), (1.0, 0.0));
+    let shape: Vec<VertexF32> = vec![vertex1, vertex2, vertex3, vertex4];
 
     let vertex_buffer = glium::VertexBuffer::new(&display, &shape).unwrap();
 
