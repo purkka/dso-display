@@ -1,7 +1,7 @@
 mod vertex;
 
-use glium::{glutin, Surface, implement_vertex, uniform};
-use std::time::{SystemTime};
+use glium::{glutin, implement_vertex, uniform, Surface};
+use std::time::SystemTime;
 
 fn main() {
     const WIDTH: u32 = 320;
@@ -37,77 +37,22 @@ fn main() {
 
     let vertex_buffer = glium::VertexBuffer::new(&display, &shape).unwrap();
 
-    // Dummy indices for the time being
-    let indices = glium::index::NoIndices(glium::index::PrimitiveType::TriangleFan);
+    let dummy_indices = glium::index::NoIndices(glium::index::PrimitiveType::TriangleFan);
 
-    let vertex_shader_bg = r#"
-        #version 140
-
-        in vec2 position;
-
-        void main() {
-            gl_Position = vec4(position, 0, 1);
-        }
-    "#;
-
-    let fragment_shader_bg = r#"
-        #version 140
-        #define PI 3.141592
-
-        out vec4 color;
-
-        uniform float time;
-        uniform uint height;
-
-        void main() {
-            vec2 uv = gl_FragCoord.xy / height;
-            uv.y += time / 8;
-
-            // variables
-            float split = 8;
-            float ncol = 2;
-
-            // the slope
-            uv.y -= tan(PI / 4) * uv.x;
-
-            // colors every other stripe
-            if (mod(floor(uv.y * split), ncol) == 0) {
-                color = vec4(0.25, 0.25, 0.25, 1);
-            } else { // keep transparent
-                color = vec4(0);
-            }
-        }
-    "#;
-
-    let vertex_shader_src = r#"
-        #version 140
-
-        in vec2 position;
-        in vec2 tex_coords;
-        out vec2 v_tex_coords;
-
-        void main() {
-            v_tex_coords = tex_coords;
-            gl_Position = vec4(position, 0.0, 1.0);
-        }
-    "#;
-
-    let fragment_shader_src = r#"
-        #version 140
-
-        in vec2 v_tex_coords;
-        out vec4 color;
-        uniform sampler2D tex;
-
-        void main() {
-            color = texture(tex, v_tex_coords);
-        }
-    "#;
-
-    let program_src = glium::Program::from_source(&display, vertex_shader_src,
-                                                  fragment_shader_src, None).unwrap();
-    let program_bg = glium::Program::from_source(&display, vertex_shader_bg,
-                                                 fragment_shader_bg, None).unwrap();
+    let program_src = glium::Program::from_source(
+        &display,
+        include_str!("../shaders/src_vertex.glsl"),
+        include_str!("../shaders/src_fragment.glsl"),
+        None,
+    )
+    .unwrap();
+    let program_bg = glium::Program::from_source(
+        &display,
+        include_str!("../shaders/bg_vertex.glsl"),
+        include_str!("../shaders/bg_fragment.glsl"),
+        None,
+    )
+    .unwrap();
 
     let draw_parameters = glium::DrawParameters {
         blend: glium::Blend::alpha_blending(),
@@ -133,8 +78,8 @@ fn main() {
             _ => (),
         }
 
-        let next_frame_time = std::time::Instant::now() +
-            std::time::Duration::from_nanos(16_666_667);
+        let next_frame_time =
+            std::time::Instant::now() + std::time::Duration::from_nanos(16_666_667);
         *control_flow = glutin::event_loop::ControlFlow::WaitUntil(next_frame_time);
 
         let uniforms_bg = uniform! {
@@ -148,10 +93,24 @@ fn main() {
 
         let mut target = display.draw();
         target.clear_color(0.2, 0.2, 0.2, 1.0);
-        target.draw(&vertex_buffer, &indices, &program_bg, &uniforms_bg,
-                    &draw_parameters).unwrap();
-        target.draw(&vertex_buffer, &indices, &program_src, &uniforms_src,
-                    &draw_parameters).unwrap();
+        target
+            .draw(
+                &vertex_buffer,
+                &dummy_indices,
+                &program_bg,
+                &uniforms_bg,
+                &draw_parameters,
+            )
+            .unwrap();
+        target
+            .draw(
+                &vertex_buffer,
+                &dummy_indices,
+                &program_src,
+                &uniforms_src,
+                &draw_parameters,
+            )
+            .unwrap();
         target.finish().unwrap();
     });
 }
